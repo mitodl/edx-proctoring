@@ -920,11 +920,7 @@ class ProctoredExamReviewCallback(ProctoredAPIView, BaseReviewCallback):
         attempt = get_exam_attempt_by_external_id(external_id)
         if attempt is None:
             raise StudentExamAttemptDoesNotExistsException('not found')
-        # if request.user.has_perm('edx_proctoring.can_review_attempt', attempt):
-        #     self.make_review(attempt, request.data)
-        #     resp = Response(data='OK')
-        # else:
-        #     resp = Response(status=403)
+        self.make_review(attempt, request.data)
         resp = Response(data='OK')
         return resp
 
