@@ -1629,8 +1629,8 @@ def get_attempt_status_summary(user_id, course_id, content_id):
     if credit_service and not exam['is_practice_exam']:
         credit_state = credit_service.get_credit_state(user_id, str(course_id), return_course_info=True)
         user = USER_MODEL.objects.get(id=user_id)
-        if not user.has_perm('edx_proctoring.can_take_proctored_exam', exam):
-            return None
+        #if not user.has_perm('edx_proctoring.can_take_proctored_exam', exam):
+        #    return None
 
     attempt = get_exam_attempt(exam['id'], user_id)
     if attempt:
@@ -1900,8 +1900,8 @@ def _get_onboarding_exam_view(exam, context, exam_id, user_id, course_id):
     """
     user = USER_MODEL.objects.get(id=user_id)
 
-    if not user.has_perm('edx_proctoring.can_take_proctored_exam', exam):
-        return None
+    #if not user.has_perm('edx_proctoring.can_take_proctored_exam', exam):
+    #    return None
 
     student_view_template = None
 
@@ -1946,8 +1946,8 @@ def _get_proctored_exam_view(exam, context, exam_id, user_id, course_id):
 
     user = USER_MODEL.objects.get(id=user_id)
 
-    if not user.has_perm('edx_proctoring.can_take_proctored_exam', exam):
-        return None
+    #if not user.has_perm('edx_proctoring.can_take_proctored_exam', exam):
+    #    return None
 
     attempt = get_exam_attempt(exam_id, user_id)
 
@@ -2029,11 +2029,11 @@ def _get_proctored_exam_view(exam, context, exam_id, user_id, course_id):
             return None
     elif attempt_status in [ProctoredExamStudentAttemptStatus.created,
                             ProctoredExamStudentAttemptStatus.download_software_clicked]:
-        if context.get('verification_status') is not APPROVED_STATUS:
-            # if the user has not id verified yet, show them the page that requires them to do so
-            student_view_template = 'proctored_exam/id_verification.html'
-        else:
-            student_view_template = 'proctored_exam/instructions.html'
+        # if context.get('verification_status') is not APPROVED_STATUS:
+        #     # if the user has not id verified yet, show them the page that requires them to do so
+        #     student_view_template = 'proctored_exam/id_verification.html'
+        # else:
+        student_view_template = 'proctored_exam/instructions.html'
     elif attempt_status == ProctoredExamStudentAttemptStatus.ready_to_start:
         student_view_template = 'proctored_exam/ready_to_start.html'
     elif attempt_status == ProctoredExamStudentAttemptStatus.error:
