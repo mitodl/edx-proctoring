@@ -1881,7 +1881,9 @@ def reset_practice_exam(exam_id, user_id, requesting_user):
 
     # resetting a submitted attempt that has not been reviewed will entirely remove that submission.
     if exam_attempt_obj.status == ProctoredExamStudentAttemptStatus.submitted:
-        remove_exam_attempt(exam_attempt_obj.id, requesting_user)
+        # This is the learner retrying their own onboarding exam, so a provider problem
+        # must not block them: remove what we can upstream and reset locally regardless.
+        remove_exam_attempt(exam_attempt_obj.id, requesting_user, require_backend_removal=False)
     else:
         exam_attempt_obj.status = ProctoredExamStudentAttemptStatus.onboarding_reset
         exam_attempt_obj.save()
@@ -1948,23 +1950,25 @@ def _remove_exam_attempt_from_backend(attempt):
         raise BackendProviderCannotRemoveAttempt(unavailable_message)
 
 
-def _remove_exam_attempts_from_backend(attempts, failed_backends=None):
+def _remove_exam_attempts_from_backend(attempts, failed_backends=frozenset()):
     """
     Best-effort provider-side removal for a collection of attempts.
 
     Provider failures are swallowed (the caller is expected to delete the attempts locally
     regardless), but once a backend fails a removal we stop calling it for the rest of this
     pass -- while still trying other, independently configured backends -- so a provider
-    outage does not cost a full request timeout for every attempt. Pass a shared
-    ``failed_backends`` set to keep that skip-list across multiple calls (e.g. batches).
+    outage does not cost a full request timeout for every attempt.
+
+    Returns the set of backends that failed, so a caller working through batches can thread
+    it back in and keep skipping them across calls.
 
     Pass a queryset with ``select_related('proctored_exam')`` to avoid a query per attempt.
     """
-    if failed_backends is None:
-        failed_backends = set()
+    # Fresh mutable set per call; the shared default is only ever copied from, never mutated.
+    failed = set(failed_backends)
     for attempt in attempts:
         backend = attempt.proctored_exam.backend
-        if backend in failed_backends:
+        if backend in failed:
             continue
         try:
             _remove_exam_attempt_from_backend(attempt)
@@ -1973,12 +1977,18 @@ def _remove_exam_attempts_from_backend(attempts, failed_backends=None):
                 'Provider removal failed for backend %r; skipping further provider calls '
                 'for it during this cleanup and removing locally only.', backend
             )
-            failed_backends.add(backend)
+            failed.add(backend)
+    return failed
 
 
-def remove_exam_attempt(attempt_id, requesting_user):
+def remove_exam_attempt(attempt_id, requesting_user, require_backend_removal=True):
     """
     Removes an exam attempt given the attempt id. requesting_user is passed through to the instructor_service.
+
+    The attempt is removed on the proctoring provider first. By default a provider failure
+    raises ``BackendProviderCannotRemoveAttempt`` and the local attempt is left untouched so
+    it can be retried. Pass ``require_backend_removal=False`` for learner-initiated resets,
+    where the provider removal is best-effort and must not block the learner.
     """
 
     log.info(
@@ -2006,7 +2016,10 @@ def remove_exam_attempt(attempt_id, requesting_user):
     # provider outage surfaces a descriptive error instead of a rolled-back, half-applied
     # delete. See _remove_exam_attempt_from_backend for why this must not happen in the
     # pre_delete signal.
-    _remove_exam_attempt_from_backend(existing_attempt)
+    if require_backend_removal:
+        _remove_exam_attempt_from_backend(existing_attempt)
+    else:
+        _remove_exam_attempts_from_backend([existing_attempt])
 
     existing_attempt.delete_exam_attempt()
     instructor_service = get_runtime_service('instructor')

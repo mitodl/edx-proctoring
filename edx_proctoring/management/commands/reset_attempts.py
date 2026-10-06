@@ -58,8 +58,9 @@ class Command(BaseCommand):
             ids_to_delete = file.readlines()
 
         total_deleted = 0
-        # Shared across batches so a backend that fails once is skipped for the whole run.
-        failed_backends = set()
+        # Threaded through each batch so a backend that fails once is skipped for the
+        # rest of the run rather than costing another timeout per batch.
+        failed_backends = frozenset()
 
         for i in range(0, len(ids_to_delete), batch_size):
             batch_to_delete = ids_to_delete[i:i + batch_size]
@@ -72,7 +73,7 @@ class Command(BaseCommand):
             # a pre_delete signal, but provider removal now lives in the API layer, so this
             # bulk path has to do it explicitly. It is best-effort (the delete below is
             # unconditional) and skips a failing backend for the rest of the run.
-            _remove_exam_attempts_from_backend(
+            failed_backends = _remove_exam_attempts_from_backend(
                 delete_queryset.select_related('proctored_exam'), failed_backends
             )
 

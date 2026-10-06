@@ -1409,6 +1409,31 @@ class ProctoredExamApiTests(ProctoredExamTestCase):
         practice_attempt.refresh_from_db()
         self.assertEqual(practice_attempt.status, ProctoredExamStudentAttemptStatus.onboarding_reset)
 
+    def test_reset_practice_exam_submitted_survives_provider_failure(self):
+        """
+        Resetting a *submitted* practice attempt removes it, which goes through the
+        provider. This is the learner retrying their own onboarding exam, so a provider
+        failure must not block them -- the reset still completes.
+        """
+        practice_attempt = self._create_exam_attempt(
+            self.practice_exam_id,
+            status=ProctoredExamStudentAttemptStatus.submitted,
+            is_practice_exam=True,
+        )
+
+        with patch(
+            'edx_proctoring.backends.null.NullBackendProvider.remove_exam_attempt',
+            side_effect=ConnectionError('provider down'),
+        ):
+            reset_practice_exam(self.practice_exam_id, self.user_id, self.user)
+
+        # the submitted attempt is gone, and the learner has a fresh attempt to take
+        self.assertFalse(ProctoredExamStudentAttempt.objects.filter(id=practice_attempt.id).exists())
+        current_attempt = ProctoredExamStudentAttempt.objects.get_current_exam_attempt(
+            self.practice_exam_id, self.user.id
+        )
+        self.assertEqual(current_attempt.status, ProctoredExamStudentAttemptStatus.created)
+
     def test_reset_exam_in_progress(self):
         """
         If an attempt is in progress it may not be reset

@@ -101,11 +101,12 @@ class ResetAttemptsTests(LoggedInTestCase):
     def test_run_command_stops_calling_failing_backend(self, mock_get_backend):
         """
         If the provider errors out (e.g. it is unreachable), the command stops calling it
-        for the rest of the run -- so it does not pay a request timeout per attempt -- while
-        still deleting every attempt locally.
+        for the rest of the run -- so it does not pay a request timeout per attempt --
+        while still deleting every attempt locally.
         """
         mock_get_backend.return_value.remove_exam_attempt.side_effect = ConnectionError('provider down')
         ids = list(ProctoredExamStudentAttempt.objects.all().values_list('id', flat=True))
+        batch_size = 2
 
         with NamedTemporaryFile() as file:
             with open(file.name, 'w') as writing_file:
@@ -114,12 +115,12 @@ class ResetAttemptsTests(LoggedInTestCase):
 
             call_command(
                 'reset_attempts',
-                batch_size=2,
+                batch_size=batch_size,
                 sleep_time=0,
                 file_path=file.name,
             )
 
-        # the provider is called once, then skipped for the rest of the run ...
+        # the failing backend is called once for the whole run, not once per attempt ...
         self.assertEqual(mock_get_backend.return_value.remove_exam_attempt.call_count, 1)
         # ... but every attempt is still deleted locally
         self.assertFalse(ProctoredExamStudentAttempt.objects.exists())
