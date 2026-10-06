@@ -29,6 +29,7 @@ from edx_proctoring.exceptions import (
     BackendProviderCannotRemoveAttempt,
     BackendProviderNotConfigured,
     BackendProviderOnboardingException,
+    BackendProviderRemovalNotConfirmed,
     BackendProviderSentNoAttemptID,
     ProctoredBaseException,
     ProctoredExamAlreadyExists,
@@ -1946,8 +1947,10 @@ def _remove_exam_attempt_from_backend(attempt):
     if not result:
         # The provider responded but did not confirm removal, so keep the local attempt: a
         # retry can converge once the provider is healthy instead of silently dropping it.
+        # This is attempt-specific -- the provider answered -- so it is raised as the more
+        # specific subclass, letting bulk callers keep using the same backend.
         log.warning('Backend %s did not confirm removal of attempt_id=%s.', exam.backend, attempt.id)
-        raise BackendProviderCannotRemoveAttempt(unavailable_message)
+        raise BackendProviderRemovalNotConfirmed(unavailable_message)
 
 
 def _remove_exam_attempts_from_backend(attempts, failed_backends=frozenset()):
@@ -1955,9 +1958,11 @@ def _remove_exam_attempts_from_backend(attempts, failed_backends=frozenset()):
     Best-effort provider-side removal for a collection of attempts.
 
     Provider failures are swallowed (the caller is expected to delete the attempts locally
-    regardless), but once a backend fails a removal we stop calling it for the rest of this
+    regardless). Once a backend proves *unreachable* we stop calling it for the rest of this
     pass -- while still trying other, independently configured backends -- so a provider
-    outage does not cost a full request timeout for every attempt.
+    outage does not cost a full request timeout for every attempt. A reachable provider that
+    merely fails to confirm one removal is not skipped, since the remaining attempts on it
+    are still worth attempting.
 
     Returns the set of backends that failed, so a caller working through batches can thread
     it back in and keep skipping them across calls.
@@ -1972,7 +1977,16 @@ def _remove_exam_attempts_from_backend(attempts, failed_backends=frozenset()):
             continue
         try:
             _remove_exam_attempt_from_backend(attempt)
+        except BackendProviderRemovalNotConfirmed:
+            # The provider answered, it just did not confirm this one. It is still healthy,
+            # so keep going -- skipping the rest would orphan them upstream for nothing.
+            log.warning(
+                'Backend %r did not confirm removal of attempt_id=%s; removing locally only.',
+                backend, attempt.id,
+            )
         except BackendProviderCannotRemoveAttempt:
+            # The provider could not be reached at all, so stop paying its timeout for
+            # every remaining attempt on that backend.
             log.warning(
                 'Provider removal failed for backend %r; skipping further provider calls '
                 'for it during this cleanup and removing locally only.', backend

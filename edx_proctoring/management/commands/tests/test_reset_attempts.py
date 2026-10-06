@@ -98,6 +98,33 @@ class ResetAttemptsTests(LoggedInTestCase):
         self.assertFalse(ProctoredExamStudentAttempt.objects.exists())
 
     @patch('edx_proctoring.api.get_backend_provider')
+    def test_run_command_unconfirmed_does_not_skip_backend(self, mock_get_backend):
+        """
+        A provider that answers but does not confirm a removal is still reachable, so the
+        command keeps calling it for the remaining attempts instead of writing the backend
+        off and deleting the rest locally without telling it.
+        """
+        mock_get_backend.return_value.remove_exam_attempt.return_value = False
+        ids = list(ProctoredExamStudentAttempt.objects.all().values_list('id', flat=True))
+
+        with NamedTemporaryFile() as file:
+            with open(file.name, 'w') as writing_file:
+                for num in ids:
+                    writing_file.write(str(num) + '\n')
+
+            call_command(
+                'reset_attempts',
+                batch_size=2,
+                sleep_time=0,
+                file_path=file.name,
+            )
+
+        # every attempt was still offered to the provider ...
+        self.assertEqual(mock_get_backend.return_value.remove_exam_attempt.call_count, len(ids))
+        # ... and the local cleanup still completed
+        self.assertFalse(ProctoredExamStudentAttempt.objects.exists())
+
+    @patch('edx_proctoring.api.get_backend_provider')
     def test_run_command_stops_calling_failing_backend(self, mock_get_backend):
         """
         If the provider errors out (e.g. it is unreachable), the command stops calling it
