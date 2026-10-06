@@ -135,8 +135,14 @@ Add it to your ``private.py``::
         'mockprock': {
             'client_id': 'abcd',
             'client_secret': 'abcdsecret',
+            'timeout': 30,
         }
     }
+
+``timeout`` is optional (default ``30``) and sets the per-request timeout, in seconds, for
+every call Open edX makes to that provider. Note that ``requests`` applies a scalar to the
+connect and read phases separately, so pass a ``(connect, read)`` tuple such as ``(5, 25)``
+if you need a hard ceiling on the total.
 
 Reinstall requirements in lms and studio.
 

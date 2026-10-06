@@ -13,8 +13,14 @@ Change Log
 
 Unreleased
 ~~~~~~~~~~
-[6.1.0] - 2026-09-01
 
+[6.1.0] - 2026-09-01
+~~~~~~~~~~~~~~~~~~~~
+
+* **Behaviour change for API consumers:** the instructor reset endpoint now responds with
+  **502** when the proctoring provider cannot remove the attempt, where it previously
+  returned a 500 or appeared to succeed. Anything driving the instructor dashboard reset
+  should handle that status.
 * Make resetting a proctored exam attempt fail gracefully when the proctoring provider
   is unavailable, instead of an unhandled 500 or a stuck reset:
 
@@ -34,6 +40,8 @@ Unreleased
     so the local attempt is kept for a later retry instead of being silently dropped.
   * Route the ``reset_attempts`` management command through the same provider-removal
     path, since provider cleanup no longer happens in the ``pre_delete`` signal.
+  * Learner-initiated practice/onboarding resets stay best-effort, so a provider problem
+    does not block a learner from retrying their own onboarding exam.
 
 [5.2.1] - 2025-12-05
 * Remove all references to Proctortrack

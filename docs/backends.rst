@@ -156,6 +156,17 @@ When an attempt is deleted on the Open edX server, it will make a ``DELETE`` req
         "status": "deleted"
     }
 
+Open edX interprets the response as follows:
+
+* ``2xx`` carrying ``{"status": "deleted"}`` -- the attempt was removed upstream, and Open
+  edX deletes its own copy.
+* ``404`` -- the attempt is already gone on your side. This counts as success, so a retried
+  reset converges instead of failing forever.
+* Any other non-2xx status -- treated as a failure. Open edX keeps its copy of the attempt
+  so the removal can be retried later.
+* ``2xx`` *without* ``{"status": "deleted"}`` -- treated as not confirmed, and handled the
+  same way as a failure.
+
 
 User management endpoint
 ^^^^^^^^^^^^^^^^^^^^^^^^

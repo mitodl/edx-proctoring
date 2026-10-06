@@ -41,8 +41,11 @@ class BaseRestProctoringProvider(ProctoringBackendProvider):
     has_dashboard = True
     supports_onboarding = True
     passing_statuses = (SoftwareSecureReviewStatus.clean,)
-    # Timeout (in seconds) applied to every outbound request to the provider so
-    # that a slow or unavailable provider cannot hang the request indefinitely.
+    # Timeout (in seconds) applied to every outbound request to the provider so that a
+    # slow or unavailable provider cannot hang the request indefinitely. ``requests``
+    # applies a scalar to the connect and read phases separately, so this bounds a request
+    # at roughly twice the value; set a ``(connect, read)`` tuple for a hard total ceiling.
+    # Overridable per backend via a ``timeout`` key in ``PROCTORING_BACKENDS``.
     timeout = 30
 
     @property
