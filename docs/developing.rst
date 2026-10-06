@@ -140,9 +140,11 @@ Add it to your ``private.py``::
     }
 
 ``timeout`` is optional (default ``30``) and sets the per-request timeout, in seconds, for
-every call Open edX makes to that provider. Note that ``requests`` applies a scalar to the
-connect and read phases separately, so pass a ``(connect, read)`` tuple such as ``(5, 25)``
-if you need a hard ceiling on the total.
+every call Open edX makes to that provider. ``requests`` applies it as two separate
+inactivity limits -- how long to wait to connect, and how long to wait for more data -- so
+it does not cap the total time a request can take: a response that keeps trickling data can
+outlast it. Pass a ``(connect, read)`` tuple such as ``(5, 25)`` to set those two phases
+independently.
 
 Reinstall requirements in lms and studio.
 
