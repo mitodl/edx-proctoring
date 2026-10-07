@@ -162,10 +162,14 @@ Open edX interprets the response as follows:
   edX deletes its own copy.
 * ``404`` -- the attempt is already gone on your side. This counts as success, so a retried
   reset converges instead of failing forever.
-* Any other non-2xx status -- treated as a failure. Open edX keeps its copy of the attempt
-  so the removal can be retried later.
+* Any other non-2xx status -- treated as a failure.
 * ``2xx`` *without* ``{"status": "deleted"}`` -- treated as not confirmed, and handled the
   same way as a failure.
+
+When an instructor resets an attempt, a failure or an unconfirmed response keeps Open edX's
+copy of the attempt so the removal can be retried.  A learner retrying an onboarding exam,
+the onboarding-error cleanup and the ``reset_attempts`` command only log it and delete Open
+edX's copy regardless.
 
 
 User management endpoint

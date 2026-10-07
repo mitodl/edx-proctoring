@@ -42,6 +42,10 @@ Unreleased
     path, since provider cleanup no longer happens in the ``pre_delete`` signal.
   * Learner-initiated practice/onboarding resets stay best-effort, so a provider problem
     does not block a learner from retrying their own onboarding exam.
+  * Deleting a ``ProctoredExam`` no longer notifies the proctoring provider about the
+    attempts that are cascade-deleted with it. Provider removal now happens at the three
+    call sites that reset attempts rather than in a ``pre_delete`` signal, so attempts
+    removed this way (a staff delete from Django admin) are left on the provider.
 
 [5.2.1] - 2025-12-05
 * Remove all references to Proctortrack
